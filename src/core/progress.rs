@@ -80,10 +80,10 @@ impl ProgressTracker {
         let value = serde_json::to_string(&progress)?;
         
         // 1. Publish to channel (for real-time subscribers)
-        conn.publish(&channel, &value).await?;
+        let _: () = conn.publish(&channel, &value).await?;
         
         // 2. Also cache in Redis (for GET fallback)
-        conn.set_ex(&key, &value, 3600).await?;
+        let _: () = conn.set_ex(&key, &value, 3600).await?;
         
         log::info!("Progress update: {}% - {}", progress.percentage, progress.message);
         
@@ -108,7 +108,7 @@ impl ProgressTracker {
 
         let channel = format!("progress:{}", self.task_id);
         let value = serde_json::to_string(&progress)?;
-        conn.publish(&channel, &value).await?;
+        let _: () = conn.publish(&channel, &value).await?;
 
         Ok(())
     }
@@ -131,7 +131,7 @@ impl ProgressTracker {
         let mut conn = client.get_async_connection().await?;
         
         let key = format!("progress_cache:{}", task_id);
-        conn.del(&key).await?;
+        let _: () = conn.del(&key).await?;
         
         Ok(())
     }
@@ -160,7 +160,7 @@ impl ProgressTracker {
             "wrapped_size": wrapped_size,
         });
         
-        conn.publish(&channel, serde_json::to_string(&message)?).await?;
+        let _: () = conn.publish(&channel, serde_json::to_string(&message)?).await?;
         
         Ok(())
     }

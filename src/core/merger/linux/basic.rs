@@ -1,9 +1,8 @@
 use anyhow::{Result, Context};
 use std::process::Command;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::fs;
-use tempfile::TempDir;
-use std::io::{Read, Write};
+use std::io::Write;
 
 use crate::core::binary::{BinaryInfo, CompilerConfig};
 use crate::core::progress::{ProgressTracker, ProgressStep};

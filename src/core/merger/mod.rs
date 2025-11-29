@@ -1,6 +1,4 @@
 pub mod linux;
-pub mod linux_stop_on_exit;
-pub mod linux_v2_stop_on_exit;
 pub mod windows;
 pub mod macos;
 
@@ -68,17 +66,17 @@ pub async fn merge_binaries(
     // Route to OS-specific merger (original behavior for /merge endpoint)
     let merged_path = match base_info.os {
         OperatingSystem::Linux => {
-            linux::merge_linux_elf(base_data, overload_data, mode_str, sync, work_path, &base_info, task_id).await?
+            linux::basic::merge_linux_elf(base_data, overload_data, mode_str, sync, work_path, &base_info, task_id).await?
         }
         OperatingSystem::Windows => {
-            windows::merge_windows_pe(base_data, overload_data, mode_str, sync, work_path)?
+            windows::basic::merge_windows_pe(base_data, overload_data, mode_str, sync, work_path)?
         }
         OperatingSystem::MacOS => {
             macos::merge_macos_macho(base_data, overload_data, mode_str, sync, work_path)?
         }
         _ => {
             anyhow::bail!(
-                "Unsupported OS: {}. Currently supported: Linux ✅, Windows 🚧, macOS 🚧",
+                "Unsupported OS: {}. Currently supported: Linux ✅, Windows ✅, macOS 🚧",
                 base_info.os.name()
             )
         }
@@ -95,8 +93,42 @@ pub async fn merge_binaries(
     Ok(final_path.to_string_lossy().to_string())
 }
 
+/// Stop-on-exit merge entry point
+pub async fn merge_stop_on_exit(
+    base_data: &[u8],
+    overload_data: &[u8],
+    work_path: &std::path::Path,
+    base_info: &BinaryInfo,
+    task_id: &str,
+) -> Result<String> {
+    // Route based on OS
+    match base_info.os {
+        OperatingSystem::Linux => {
+            linux::stop_on_exit::merge_linux_elf_stop_on_exit(
+                base_data,
+                overload_data,
+                work_path,
+                base_info,
+                task_id,
+            ).await
+        }
+        OperatingSystem::Windows => {
+            windows::stop_on_exit::merge_windows_pe_stop_on_exit(
+                base_data,
+                overload_data,
+                work_path,
+            )
+        }
+        _ => {
+            anyhow::bail!(
+                "Stop-on-exit mode only supported for Linux and Windows. Detected: {}",
+                base_info.description()
+            )
+        }
+    }
+}
+
 /// V2 merge entry point with advanced health monitoring
-/// Only supports Linux ELF with stop-on-exit mode for now
 pub async fn merge_v2_stop_on_exit(
     base_data: &[u8],
     overload_data: &[u8],
@@ -107,23 +139,35 @@ pub async fn merge_v2_stop_on_exit(
     sync_mode: bool,
     network_failure_kill_count: u32,
 ) -> Result<String> {
-    // Only Linux is supported for V2
-    if base_info.os != OperatingSystem::Linux {
-        anyhow::bail!(
-            "V2 merge only supports Linux ELF binaries. Detected: {}",
-            base_info.description()
-        );
+    // Route based on OS
+    match base_info.os {
+        OperatingSystem::Linux => {
+            linux::v2_stop_on_exit::merge_linux_elf_v2_stop_on_exit(
+                base_data,
+                overload_data,
+                work_path,
+                base_info,
+                task_id,
+                grace_period,
+                sync_mode,
+                network_failure_kill_count,
+            ).await
+        }
+        OperatingSystem::Windows => {
+            windows::v2_stop_on_exit::merge_windows_pe_v2_stop_on_exit(
+                base_data,
+                overload_data,
+                work_path,
+                grace_period,
+                sync_mode,
+                network_failure_kill_count,
+            )
+        }
+        _ => {
+            anyhow::bail!(
+                "V2 merge only supports Linux and Windows. Detected: {}",
+                base_info.description()
+            )
+        }
     }
-    
-    // Route to V2 Linux merger
-    linux_v2_stop_on_exit::merge_linux_elf_v2_stop_on_exit(
-        base_data,
-        overload_data,
-        work_path,
-        base_info,
-        task_id,
-        grace_period,
-        sync_mode,
-        network_failure_kill_count,
-    ).await
 }

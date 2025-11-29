@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::fmt;
+use goblin::Object;
 
 #[derive(Debug, Clone)]
 pub struct StoredBinary {
@@ -12,10 +13,10 @@ pub struct StoredBinary {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Platform {
-    LinuxELF,
-    WindowsPE,
-    MacOSMachO,
-    Unknown,
+    LINUX_ELF,
+    WINDOWS_PE,
+    MACOS_MACH_O,
+    UNKNOWN,
 }
 
 impl fmt::Display for Platform {
@@ -26,44 +27,24 @@ impl fmt::Display for Platform {
 
 impl Platform {
     pub fn detect(data: &[u8]) -> Self {
-        if data.len() < 4 {
-            return Platform::Unknown;
+        match Object::parse(data) {
+            Ok(Object::Elf(_)) => Platform::LINUX_ELF,
+            Ok(Object::PE(_)) => Platform::WINDOWS_PE,
+            Ok(Object::Mach(_)) => Platform::MACOS_MACH_O,
+            _ => Platform::UNKNOWN,
         }
-        
-        // ELF magic: 0x7f 'E' 'L' 'F'
-        if data.starts_with(b"\x7fELF") {
-            return Platform::LinuxELF;
-        }
-        
-        // PE magic: 'M' 'Z'
-        if data.starts_with(b"MZ") {
-            return Platform::WindowsPE;
-        }
-        
-        // Mach-O magic (various)
-        if data.len() >= 4 {
-            let magic = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-            match magic {
-                0xfeedface | 0xfeedfacf | 0xcefaedfe | 0xcffaedfe => {
-                    return Platform::MacOSMachO;
-                }
-                _ => {}
-            }
-        }
-        
-        Platform::Unknown
     }
     
     pub fn name(&self) -> &'static str {
         match self {
-            Platform::LinuxELF => "Linux ELF",
-            Platform::WindowsPE => "Windows PE",
-            Platform::MacOSMachO => "macOS Mach-O",
-            Platform::Unknown => "Unknown",
+            Platform::LINUX_ELF => "Linux ELF",
+            Platform::WINDOWS_PE => "Windows PE",
+            Platform::MACOS_MACH_O => "macOS Mach-O",
+            Platform::UNKNOWN => "Unknown",
         }
     }
     
     pub fn is_supported(&self) -> bool {
-        matches!(self, Platform::LinuxELF)
+        matches!(self, Platform::LINUX_ELF)
     }
 }

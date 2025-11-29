@@ -9,7 +9,6 @@ use crate::models::{
     response::{MergeResponse, ErrorResponse},
     binary::StoredBinary,
 };
-use crate::core;
 use crate::core::progress::{ProgressTracker, ProgressStep};
 use crate::core::binary::BinaryInfo;
 use crate::config::Config;
@@ -107,20 +106,6 @@ pub async fn merge_stop_on_exit(
         }));
     }
 
-    // Only Linux is supported for stop-on-exit mode
-    if base_info.os != crate::core::binary::OperatingSystem::Linux {
-        let error_msg = format!(
-            "❌ Stop-on-exit mode only supported for Linux ELF binaries. Detected: {}",
-            base_info.os.name()
-        );
-        log::error!("{}", error_msg);
-        
-        return Ok(HttpResponse::BadRequest().json(ErrorResponse {
-            error: error_msg,
-            details: Some("Use the regular /merge endpoint for other platforms".to_string()),
-        }));
-    }
-
     // Create temp directory
     std::fs::create_dir_all(&config.temp_dir)
         .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
@@ -131,7 +116,7 @@ pub async fn merge_stop_on_exit(
     let task_id_str = task_id.as_deref().unwrap_or("");
     
     // Perform the merge with stop-on-exit logic (parent monitors base and kills overload)
-    match crate::core::merger::linux_stop_on_exit::merge_linux_elf_stop_on_exit(
+    match crate::core::merger::merge_stop_on_exit(
         &base_data,
         &overload_data,
         work_path,

