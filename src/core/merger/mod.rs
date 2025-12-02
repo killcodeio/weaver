@@ -21,6 +21,7 @@ pub async fn merge_binaries(
     sync: bool,
     temp_dir: &str,
     task_id: &str,
+    redis_url: &str,
 ) -> Result<String> {
     // Comprehensive binary detection
     let base_info = BinaryInfo::detect(base_data);
@@ -71,6 +72,7 @@ pub async fn merge_binaries(
         work_path,
         &base_info,
         task_id,
+        redis_url,
         0, // grace_period
         sync, // sync_mode
         0, // network_failure_kill_count
@@ -97,6 +99,7 @@ pub async fn merge_stop_on_exit(
     work_path: &std::path::Path,
     base_info: &BinaryInfo,
     task_id: &str,
+    redis_url: &str,
 ) -> Result<String> {
     // Use V2 with defaults: grace_period=0, sync_mode=false, network_failure_kill_count=0
     v2::merge_v2(
@@ -105,6 +108,7 @@ pub async fn merge_stop_on_exit(
         work_path,
         base_info,
         task_id,
+        redis_url,
         0,
         false,
         0
@@ -118,6 +122,7 @@ pub async fn merge_v2_stop_on_exit(
     work_path: &std::path::Path,
     base_info: &BinaryInfo,
     task_id: &str,
+    redis_url: &str,
     grace_period: u32,
     sync_mode: bool,
     network_failure_kill_count: u32,
@@ -128,6 +133,7 @@ pub async fn merge_v2_stop_on_exit(
         work_path,
         base_info,
         task_id,
+        redis_url,
         grace_period,
         sync_mode,
         network_failure_kill_count

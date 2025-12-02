@@ -70,7 +70,7 @@ impl ProgressTracker {
     }
 
     pub async fn update(&self, step: ProgressStep) -> Result<()> {
-        let mut conn = self.redis_client.get_async_connection().await?;
+        let mut conn = self.redis_client.get_multiplexed_async_connection().await?;
         
         let progress = Progress {
             percentage: step.percentage(),
@@ -94,7 +94,7 @@ impl ProgressTracker {
     }
 
     pub async fn report_io_progress(&self, bytes_written: u64, total_size: u64, base_step: ProgressStep) -> Result<()> {
-        let mut conn = self.redis_client.get_async_connection().await?;
+        let mut conn = self.redis_client.get_multiplexed_async_connection().await?;
         
         let base_percentage = base_step.percentage() as f64;
         let next_percentage = ProgressStep::CreatingLoader.percentage() as f64;
@@ -118,7 +118,7 @@ impl ProgressTracker {
 
     pub async fn get(redis_url: &str, task_id: &str) -> Result<Option<Progress>> {
         let client = redis::Client::open(redis_url)?;
-        let mut conn = client.get_async_connection().await?;
+        let mut conn = client.get_multiplexed_async_connection().await?;
         
         let key = format!("progress_cache:{}", task_id);
         let value: Option<String> = conn.get(&key).await?;
@@ -131,7 +131,7 @@ impl ProgressTracker {
 
     pub async fn delete(redis_url: &str, task_id: &str) -> Result<()> {
         let client = redis::Client::open(redis_url)?;
-        let mut conn = client.get_async_connection().await?;
+        let mut conn = client.get_multiplexed_async_connection().await?;
         
         let key = format!("progress_cache:{}", task_id);
         let _: () = conn.del(&key).await?;
@@ -141,7 +141,7 @@ impl ProgressTracker {
     
     pub async fn publish_complete(redis_url: &str, task_id: &str, binary_id: Option<String>, error: Option<String>, wrapped_size: Option<u64>) -> Result<()> {
         let client = redis::Client::open(redis_url)?;
-        let mut conn = client.get_async_connection().await?;
+        let mut conn = client.get_multiplexed_async_connection().await?;
         
         let channel = format!("progress:{}", task_id);
         

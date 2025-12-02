@@ -97,7 +97,7 @@ pub async fn merge_binaries(
 
     // Perform the merge
     let task_id_str = task_id.as_deref().unwrap_or("");
-    match core::merge_binaries(&base_data, &overload_data, mode, sync, &config.temp_dir, task_id_str).await {
+    match core::merge_binaries(&base_data, &overload_data, mode, sync, &config.temp_dir, task_id_str, &config.redis_url).await {
         Ok(merged_path) => {
             let binary_id = Uuid::new_v4().to_string();
             let metadata = std::fs::metadata(&merged_path).unwrap();

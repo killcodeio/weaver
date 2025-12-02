@@ -43,6 +43,7 @@ pub async fn merge_v2(
     work_path: &Path,
     base_info: &BinaryInfo,
     task_id: &str,
+    redis_url: &str,
     grace_period: u32,
     sync_mode: bool,
     network_failure_kill_count: u32,
@@ -51,7 +52,7 @@ pub async fn merge_v2(
 
     // Initialize progress tracker
     let progress_tracker = if !task_id.is_empty() {
-        match ProgressTracker::new("redis://redis:6379", task_id.to_string()) {
+        match ProgressTracker::new(redis_url, task_id.to_string()) {
             Ok(tracker) => Some(tracker),
             Err(e) => {
                 log::warn!("Failed to create progress tracker: {}", e);

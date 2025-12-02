@@ -101,7 +101,7 @@ int main() {
     let temp_dir = tempdir().expect("Failed to create temp dir");
     let temp_path = temp_dir.path().to_str().unwrap();
     
-    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::Before, true, temp_path) {
+    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::Before, true, temp_path, "", "redis://redis:6379") {
         Ok(path) => {
             println!("✅ Merged successfully: {}", path);
             path
@@ -215,7 +215,7 @@ int main() {
     let temp_dir = tempdir().expect("Failed to create temp dir");
     let temp_path = temp_dir.path().to_str().unwrap();
     
-    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::Before, true, temp_path) {
+    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::Before, true, temp_path, "", "redis://redis:6379") {
         Ok(path) => {
             println!("✅ Merged ARM64 binaries: {}", path);
             path
@@ -324,7 +324,7 @@ int main() {
     let temp_dir = tempdir().expect("Failed to create temp dir");
     let temp_path = temp_dir.path().to_str().unwrap();
     
-    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::Before, true, temp_path) {
+    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::Before, true, temp_path, "", "redis://redis:6379") {
         Ok(path) => {
             println!("✅ Merged Windows binaries: {}", path);
             path
@@ -433,7 +433,7 @@ int main() {
     let temp_dir = tempdir().expect("Failed to create temp dir");
     let temp_path = temp_dir.path().to_str().unwrap();
     
-    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::After, true, temp_path) {
+    let merged_path = match merge_binaries(&base_data, &overload_data, MergeMode::After, true, temp_path, "", "redis://redis:6379") {
         Ok(path) => {
             println!("✅ Merged with AFTER mode: {}", path);
             path

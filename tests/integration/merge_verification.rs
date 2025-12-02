@@ -135,7 +135,9 @@ int main() {
         &overload_data,
         MergeMode::Before,
         true, // sync
-        temp_path
+        temp_path,
+        "", // task_id
+        "redis://redis:6379", // redis_url (test default)
     ) {
         Ok(binary_id) => {
             println!("   ✅ Binaries merged successfully");

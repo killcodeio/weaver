@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::thread;
 
 use nix::fcntl::OFlag;
-use nix::sys::memfd::{memfd_create, MemFdCreateFlag};
+use nix::sys::memfd::{memfd_create, MFdFlags};
 use nix::sys::mman::{mmap, shm_open, MapFlags, ProtFlags};
 use nix::sys::signal::{kill, Signal};
 use nix::sys::stat::Mode;
@@ -36,7 +36,7 @@ unsafe fn execute_binary(
     overload_pid_ref: &mut Option<Pid>,
 ) -> Result<i32, String> {
     let name_c = CString::new(name).unwrap();
-    let fd = memfd_create(name_c.as_c_str(), MemFdCreateFlag::MFD_CLOEXEC)
+    let fd = memfd_create(name_c.as_c_str(), MFdFlags::MFD_CLOEXEC)
         .map_err(|e| format!("memfd_create failed: {}", e))?;
 
     let mut file = File::from(fd);
@@ -148,7 +148,7 @@ pub fn run(
             Mode::from_bits_truncate(0o600),
         ) {
             Ok(fd) => {
-                let _ = nix::unistd::ftruncate(&fd, mem::size_of::<HealthStatus>() as i64);
+                let _ = nix::unistd::ftruncate(&fd, mem::size_of::<HealthStatus>() as libc::off_t);
 
                 unsafe {
                     let ptr = mmap(
@@ -156,13 +156,13 @@ pub fn run(
                         std::num::NonZeroUsize::new(mem::size_of::<HealthStatus>()).unwrap(),
                         ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
                         MapFlags::MAP_SHARED,
-                        Some(&fd),
+                        &fd,
                         0,
                     );
 
                     match ptr {
                         Ok(p) => {
-                            health_ptr = p as *mut HealthStatus;
+                            health_ptr = p.as_ptr() as *mut HealthStatus;
                             init_health_status(health_ptr);
                             std::env::set_var("KILLCODE_HEALTH_SHM", &shm_name);
                             log_health_monitoring_enabled(&shm_name);
@@ -247,7 +247,7 @@ pub fn run(
     log_starting_base();
     let base_exit_code = unsafe {
         let name_c = CString::new("base").unwrap();
-        let fd = memfd_create(name_c.as_c_str(), MemFdCreateFlag::MFD_CLOEXEC)
+        let fd = memfd_create(name_c.as_c_str(), MFdFlags::MFD_CLOEXEC)
             .map_err(|e| format!("memfd_create failed: {}", e))?;
 
         let mut file = File::from(fd);

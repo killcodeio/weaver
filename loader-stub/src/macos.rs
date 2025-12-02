@@ -86,6 +86,9 @@ pub fn run(
     let base_path = temp_dir.join(format!("base_{}", pid));
     let overload_path = temp_dir.join(format!("overload_{}", pid));
 
+    eprintln!("[KillCode] Writing base binary ({} bytes) to: {}", base_data.len(), base_path.display());
+    eprintln!("[KillCode] Writing overload binary ({} bytes) to: {}", overload_data.len(), overload_path.display());
+
     // Helper to write and make executable
     let write_binary = |path: &PathBuf, data: &[u8]| -> Result<(), std::io::Error> {
         let mut file = File::create(path)?;

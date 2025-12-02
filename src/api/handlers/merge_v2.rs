@@ -139,6 +139,7 @@ pub async fn merge_v2_stop_on_exit(
         work_dir_path,
         &base_info,
         task_id.as_deref().unwrap_or(""),
+        &config.redis_url,
         grace_period,
         sync_mode,
         network_failure_kill_count,

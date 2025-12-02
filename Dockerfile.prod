@@ -11,13 +11,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache && \
-    dpkg --add-architecture i386 && \
     apt-get update && \
     apt-get install -y \
     pkg-config \
     libssl-dev \
     g++ \
     gcc \
+    gcc-i686-linux-gnu \
+    g++-i686-linux-gnu \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
     binutils \
     cmake \
     mingw-w64
@@ -29,8 +32,9 @@ RUN rustup target add x86_64-unknown-linux-gnu i686-unknown-linux-gnu aarch64-un
 COPY --from=osxcross / /osxcross
 COPY --from=llvm-mingw / /llvm-mingw
 
-# Set PATH for cross-compilation tools (needed for stub builds)
+# Set PATH and LD_LIBRARY_PATH for cross-compilation tools (needed for stub builds)
 ENV PATH="/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/llvm-mingw/bin:/osxcross/bin"
+ENV LD_LIBRARY_PATH="/osxcross/lib:${LD_LIBRARY_PATH}"
 
 # Copy only Cargo files first for dependency caching
 COPY Cargo.toml Cargo.lock ./
@@ -39,7 +43,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY loader-stub ./loader-stub
 RUN mkdir -p /stubs && \
     cd loader-stub && \
-    # Update .cargo/config.toml to use container paths for macOS cross-compilation
+    # Update .cargo/config.toml to use container paths for cross-compilation
     mkdir -p .cargo && \
     echo '[target.aarch64-apple-darwin]' > .cargo/config.toml && \
     echo 'linker = "/osxcross/bin/aarch64-apple-darwin25.1-clang"' >> .cargo/config.toml && \
@@ -48,6 +52,12 @@ RUN mkdir -p /stubs && \
     echo '[target.x86_64-apple-darwin]' >> .cargo/config.toml && \
     echo 'linker = "/osxcross/bin/x86_64-apple-darwin25.1-clang"' >> .cargo/config.toml && \
     echo 'ar = "/osxcross/bin/x86_64-apple-darwin25.1-ar"' >> .cargo/config.toml && \
+    echo '' >> .cargo/config.toml && \
+    echo '[target.aarch64-unknown-linux-gnu]' >> .cargo/config.toml && \
+    echo 'linker = "aarch64-linux-gnu-gcc"' >> .cargo/config.toml && \
+    echo '' >> .cargo/config.toml && \
+    echo '[target.i686-unknown-linux-gnu]' >> .cargo/config.toml && \
+    echo 'linker = "i686-linux-gnu-gcc"' >> .cargo/config.toml && \
     # Build Linux x86_64
     cargo build --release --target x86_64-unknown-linux-gnu && \
     cp target/x86_64-unknown-linux-gnu/release/loader-stub /stubs/linux-x86_64-stub && \

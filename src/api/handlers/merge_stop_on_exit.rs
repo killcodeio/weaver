@@ -122,6 +122,7 @@ pub async fn merge_stop_on_exit(
         work_path,
         &base_info,
         task_id_str,
+        &config.redis_url,
     ).await {
         Ok(merged_path) => {
             let binary_id = Uuid::new_v4().to_string();

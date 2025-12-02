@@ -7,7 +7,7 @@ edition = "2021"
 cfg-if = "1.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-nix = { version = "0.27", features = ["process", "mman", "signal", "fs", "uio"] }
+nix = { version = "0.30", features = ["process", "mman", "signal", "fs", "uio"] }
 libc = "0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
