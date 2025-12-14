@@ -243,6 +243,10 @@ pub fn run(
                 pid_cell.store(child.as_raw(), Ordering::Relaxed);
             }
 
+            if !health_ptr.is_null() {
+                unsafe { (*health_ptr).base_pid = child.as_raw(); }
+            }
+
             let mut status_code = -1;
             match waitpid(child, None) {
                 Ok(WaitStatus::Exited(_, code)) => status_code = code,

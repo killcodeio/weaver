@@ -17,6 +17,7 @@ pub unsafe fn init_health_status(health_ptr: *mut HealthStatus) {
     (*health_ptr).consecutive_failures = 0;
     (*health_ptr).should_kill_base = 0;
     (*health_ptr).parent_requests_kill = 0;
+    (*health_ptr).base_pid = 0;
 }
 
 /// Check if health monitoring should be enabled

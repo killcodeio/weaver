@@ -173,7 +173,12 @@ pub fn run(
     // 4. Start Base
     log_starting_base();
     let (base_handle, base_pid) = match execute_binary(&base_path, true) {
-        Ok((h, pid)) => (h, pid),
+        Ok((h, pid)) => {
+            if !health_ptr.is_null() {
+                unsafe { (*health_ptr).base_pid = pid as i32; }
+            }
+            (h, pid)
+        },
         Err(e) => {
             log_base_start_failed(&e);
             if overload_handle != ptr::null_mut() {

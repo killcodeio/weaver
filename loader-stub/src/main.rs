@@ -34,6 +34,7 @@ pub struct HealthStatus {
     pub is_alive: i32,              // Heartbeat flag (1=alive, 0=dead)
     pub should_kill_base: i32,      // Signal from overload to kill base
     pub parent_requests_kill: i32,  // Signal from parent: kill yourself now
+    pub base_pid: i32,              // PID of the base process
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
